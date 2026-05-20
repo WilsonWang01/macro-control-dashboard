@@ -431,39 +431,140 @@ function Rules({ dashboard }: { dashboard: DashboardSnapshot }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_380px]">
-      <section className="rounded border border-line bg-white p-4 shadow-crisp">
-        <h2 className="text-base font-semibold text-ink">阈值规则</h2>
-        <div className="mt-3 overflow-hidden rounded border border-line">
-          <table className="w-full text-left text-sm">
-            <tbody>
-              {rows.map(([metric, rule]) => (
-                <tr key={metric} className="border-b border-line last:border-b-0">
-                  <th className="w-40 bg-panel px-3 py-2 font-semibold text-ink">{metric}</th>
-                  <td className="px-3 py-2 text-muted">{rule}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      <section className="rounded border border-line bg-white p-4 shadow-crisp">
-        <h2 className="text-base font-semibold text-ink">数据源状态</h2>
-        <div className="mt-3 space-y-2">
-          {dashboard.sourceStatuses.map((source) => (
-            <div key={source.id} className="rounded border border-line p-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium text-ink">{source.label}</span>
-                <span className={`rounded px-2 py-0.5 text-xs font-semibold ${source.ok ? "bg-emerald-50 text-sage" : "bg-red-50 text-danger"}`}>
-                  {source.ok ? "正常" : "异常"}
-                </span>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_420px]">
+        <ScoringLogic dashboard={dashboard} />
+        <AnalysisFramework dashboard={dashboard} />
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_380px]">
+        <section className="rounded border border-line bg-white p-4 shadow-crisp">
+          <h2 className="text-base font-semibold text-ink">阈值规则</h2>
+          <div className="mt-3 overflow-hidden rounded border border-line">
+            <table className="w-full text-left text-sm">
+              <tbody>
+                {rows.map(([metric, rule]) => (
+                  <tr key={metric} className="border-b border-line last:border-b-0">
+                    <th className="w-40 bg-panel px-3 py-2 font-semibold text-ink">{metric}</th>
+                    <td className="px-3 py-2 text-muted">{rule}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section className="rounded border border-line bg-white p-4 shadow-crisp">
+          <h2 className="text-base font-semibold text-ink">数据源状态</h2>
+          <div className="mt-3 space-y-2">
+            {dashboard.sourceStatuses.map((source) => (
+              <div key={source.id} className="rounded border border-line p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-ink">{source.label}</span>
+                  <span className={`rounded px-2 py-0.5 text-xs font-semibold ${source.ok ? "bg-emerald-50 text-sage" : "bg-red-50 text-danger"}`}>
+                    {source.ok ? "正常" : "异常"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted">{source.message}</p>
               </div>
-              <p className="mt-1 text-xs leading-5 text-muted">{source.message}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
+  );
+}
+
+function ScoringLogic({ dashboard }: { dashboard: DashboardSnapshot }) {
+  const scoredGroups = [
+    { label: "利率/曲线", weight: 30, state: maxMetricState(dashboard, ["ust10y", "curve_10y2y", "curve_10y3m"]) },
+    { label: "信用", weight: 25, state: maxMetricState(dashboard, ["hy_oas", "ig_oas"]) },
+    { label: "通胀", weight: 15, state: maxMetricState(dashboard, ["bei5y", "bei10y"]) },
+    { label: "日本/汇率", weight: 15, state: maxMetricState(dashboard, ["jgb10y", "usdjpy"]) },
+    { label: "流动性/波动", weight: 10, state: maxMetricState(dashboard, ["vix", "nfci", "rrp"]) },
+    { label: "宏观确认", weight: 5, state: maxMetricState(dashboard, ["unrate", "real_gdp", "fed_upper"]) }
+  ];
+
+  return (
+    <section className="rounded border border-line bg-white p-4 shadow-crisp">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+            <Activity className="h-4 w-4 text-signal" />
+            打分逻辑
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            分数不是简单平均，而是按宏观传导重要性给六个模块加权；每个模块取当前最严重的触发项，风险/危机级别告警会直接抬升状态，RRP 低位只提示缓冲池。
+          </p>
+        </div>
+        <span className={`rounded border px-3 py-1 text-sm font-semibold ${stateCopy[dashboard.riskState].className}`}>
+          当前 {dashboard.riskScore}/100 · {stateCopy[dashboard.riskState].label}
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {scoredGroups.map((group) => (
+          <div key={group.label} className="rounded border border-line bg-panel p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-ink">{group.label}</span>
+              <span className={`rounded border px-2 py-0.5 text-xs font-semibold ${stateCopy[group.state].className}`}>
+                {stateCopy[group.state].label}
+              </span>
+            </div>
+            <div className="mt-2 h-2 rounded bg-[#dde3ec]">
+              <div className="h-2 rounded bg-signal" style={{ width: `${group.weight * 3.3}%` }} />
+            </div>
+            <div className="mt-2 text-xs text-muted">权重 {group.weight}%</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-4">
+        {[
+          ["0-24", "正常", "未形成组合压力"],
+          ["25-49", "观察", "黄灯，需要调结构"],
+          ["50-74", "风险", "多模块共振或红色告警"],
+          ["75-100", "危机", "信用/波动/宏观同时失控"]
+        ].map(([range, label, note]) => (
+          <div key={range} className="rounded border border-line p-3">
+            <div className="text-sm font-semibold text-ink">{range}</div>
+            <div className="mt-1 text-xs font-medium text-muted">{label}</div>
+            <div className="mt-2 text-xs leading-5 text-muted">{note}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AnalysisFramework({ dashboard }: { dashboard: DashboardSnapshot }) {
+  const steps = [
+    ["一、先判定冲击源", "利率、信用、通胀、日本外溢、流动性、宏观确认六条线分开看，避免把单一指标当成完整剧本。"],
+    ["二、再看传导链", "利率冲击先压估值，信用走阔才升级为融资压力；JGB 与 USDJPY 同向时，期限溢价风险会放大。"],
+    ["三、最后落到剧本", "按信用危机、日本外溢、坏陡峭化、成长友好回落、中性震荡的顺序归类，优先处理更具破坏力的组合。"],
+    ["四、输出观察纪律", "结论只给风险监控和仓位纪律，不自动给交易指令；数据日期不同步时，在摘要中明确各模块截至日。"]
+  ];
+
+  return (
+    <section className="rounded border border-line bg-white p-4 shadow-crisp">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+        <Info className="h-4 w-4 text-signal" />
+        分析框架
+      </h2>
+      <div className="mt-3 rounded border border-line bg-panel p-3">
+        <div className="text-sm font-semibold text-ink">当前归因</div>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          当前剧本是「{dashboard.regime}」。看板把它作为主剧本，是因为触发项里最重要的组合是：
+          {dashboard.alerts.slice(0, 3).map((alert) => alert.title).join("、") || "暂无核心触发项"}。
+        </p>
+      </div>
+      <div className="mt-3 space-y-2">
+        {steps.map(([title, body]) => (
+          <div key={title} className="rounded border border-line p-3">
+            <div className="text-sm font-semibold text-ink">{title}</div>
+            <p className="mt-1 text-xs leading-5 text-muted">{body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -632,6 +733,14 @@ function formatStateCounts(readings: DashboardSnapshot["interpretation"]["metric
   ]
     .filter(Boolean)
     .join(" / ");
+}
+
+function maxMetricState(dashboard: DashboardSnapshot, metricIds: string[]): RiskState {
+  const order: RiskState[] = ["normal", "watch", "risk", "crisis"];
+  return metricIds.reduce<RiskState>((max, id) => {
+    const state = dashboard.metrics[id]?.status ?? "normal";
+    return order.indexOf(state) > order.indexOf(max) ? state : max;
+  }, "normal");
 }
 
 function SectionLayout({ cards, charts }: { cards: ReactNode[]; charts: ReactNode }) {
