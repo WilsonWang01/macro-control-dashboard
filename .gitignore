@@ -1,0 +1,7 @@
+node_modules
+dist
+.cache
+public/api
+.env
+.DS_Store
+npm-debug.log*
