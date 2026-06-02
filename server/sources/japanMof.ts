@@ -15,7 +15,8 @@ const columns: Array<{ index: number; metricId: string }> = [
 
 export async function fetchJapanMofObservations(): Promise<SourceResult> {
   const fetchedAt = new Date().toISOString();
-  const text = await fetchDecodedText(currentMonthUrl, "shift_jis", 10000);
+  const url = `${currentMonthUrl}?ts=${Date.now()}`;
+  const text = await fetchDecodedText(url, "shift_jis", 10000);
   const rows = parseCsv(text).slice(2);
   const observations: Observation[] = [];
 

@@ -6,7 +6,9 @@ export async function fetchText(url: string, timeoutMs = 9000): Promise<string> 
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "user-agent": "macro-control-dashboard/0.1"
+        "user-agent": "macro-control-dashboard/0.1",
+        "cache-control": "no-cache",
+        "pragma": "no-cache"
       }
     });
 
@@ -32,7 +34,9 @@ export async function fetchDecodedText(
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "user-agent": "macro-control-dashboard/0.1"
+        "user-agent": "macro-control-dashboard/0.1",
+        "cache-control": "no-cache",
+        "pragma": "no-cache"
       }
     });
 
