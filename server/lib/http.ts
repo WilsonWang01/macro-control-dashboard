@@ -10,6 +10,10 @@ export async function fetchText(url: string, timeoutMs = 9000): Promise<string> 
   return buffer.toString("utf8");
 }
 
+export async function fetchBuffer(url: string, timeoutMs = 9000): Promise<Buffer> {
+  return fetchBufferWithRetry(url, timeoutMs);
+}
+
 export async function fetchDecodedText(
   url: string,
   encoding: string,

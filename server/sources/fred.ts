@@ -1,4 +1,9 @@
-import { fetchText } from "../lib/http";
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+import { fetchBuffer, fetchText } from "../lib/http";
 import { parseCsv, parseDate, parseNumber } from "../lib/csv";
 import type { Observation, SourceResult } from "../../shared/types";
 
@@ -33,6 +38,7 @@ const fredSeries: FredSeries[] = [
 
 const fredTimeoutMs = 8000;
 const fredConcurrency = 3;
+const execFileAsync = promisify(execFile);
 
 export async function fetchFredObservations(): Promise<SourceResult> {
   const fetchedAt = new Date().toISOString();
@@ -49,7 +55,7 @@ export async function fetchFredObservations(): Promise<SourceResult> {
       try {
         const rows = process.env.FRED_API_KEY
           ? await fetchOfficialSeries(series, startDate)
-          : await fetchPublicCsvSeries(series, startDate);
+          : await fetchPublicSeries(series, startDate);
 
         for (const row of rows) {
           const value = series.transform ? series.transform(row.value) : row.value;
@@ -81,7 +87,7 @@ export async function fetchFredObservations(): Promise<SourceResult> {
           ? `${failures.length} series failed: ${failures.slice(0, 4).join("; ")}`
           : process.env.FRED_API_KEY
             ? "Official API"
-            : "Public CSV endpoint"
+            : "Public CSV/XLSX endpoint"
     },
     observations
   };
@@ -107,6 +113,24 @@ async function fetchOfficialSeries(series: FredSeries, startDate: string) {
     .filter((point): point is { date: string; value: number } => point.value !== undefined);
 }
 
+async function fetchPublicSeries(series: FredSeries, startDate: string) {
+  if (process.env.GITHUB_ACTIONS) {
+    return fetchPublicXlsxSeries(series, startDate);
+  }
+
+  try {
+    return await fetchPublicCsvSeries(series, startDate);
+  } catch (csvError) {
+    try {
+      return await fetchPublicXlsxSeries(series, startDate);
+    } catch (xlsxError) {
+      const csvMessage = csvError instanceof Error ? csvError.message : String(csvError);
+      const xlsxMessage = xlsxError instanceof Error ? xlsxError.message : String(xlsxError);
+      throw new Error(`CSV failed (${csvMessage}); XLSX failed (${xlsxMessage})`);
+    }
+  }
+}
+
 async function fetchPublicCsvSeries(series: FredSeries, startDate: string) {
   const params = new URLSearchParams({
     id: series.seriesId,
@@ -126,6 +150,61 @@ async function fetchPublicCsvSeries(series: FredSeries, startDate: string) {
       return date && value !== undefined ? { date, value } : undefined;
     })
     .filter((point): point is { date: string; value: number } => point !== undefined);
+}
+
+async function fetchPublicXlsxSeries(series: FredSeries, startDate: string) {
+  const params = new URLSearchParams({
+    id: series.seriesId,
+    cosd: startDate
+  });
+  const url = `https://fred.stlouisfed.org/graph/fredgraph.xls?${params.toString()}`;
+  const buffer = await fetchBuffer(url, fredTimeoutMs);
+  const xml = await readXlsxSheetXml(buffer);
+  return parseFredXlsxSheet(xml);
+}
+
+async function readXlsxSheetXml(buffer: Buffer): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "macro-fred-"));
+  const file = join(dir, "fred.xlsx");
+
+  try {
+    await writeFile(file, buffer);
+    const { stdout } = await execFileAsync("unzip", ["-p", file, "xl/worksheets/sheet2.xml"], {
+      encoding: "utf8",
+      maxBuffer: 5 * 1024 * 1024
+    });
+    return String(stdout);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+function parseFredXlsxSheet(xml: string) {
+  const rows = xml.match(/<row\b[\s\S]*?<\/row>/g) ?? [];
+  return rows
+    .slice(1)
+    .map((row) => {
+      const values: Partial<Record<"A" | "B", string>> = {};
+      const cells = row.matchAll(/<c\b([^>]*)>(?:<v>([^<]*)<\/v>)?<\/c>/g);
+
+      for (const cell of cells) {
+        const column = cell[1].match(/\br="([A-Z]+)\d+"/)?.[1];
+        if (column === "A" || column === "B") {
+          values[column] = cell[2];
+        }
+      }
+
+      const serialDate = values.A === undefined ? Number.NaN : Number(values.A);
+      const date = Number.isFinite(serialDate) ? excelSerialDateToIso(serialDate) : undefined;
+      const value = parseNumber(values.B);
+      return date && value !== undefined ? { date, value } : undefined;
+    })
+    .filter((point): point is { date: string; value: number } => point !== undefined);
+}
+
+function excelSerialDateToIso(serialDate: number): string {
+  const excelEpoch = Date.UTC(1899, 11, 30);
+  return new Date(excelEpoch + serialDate * 86400000).toISOString().slice(0, 10);
 }
 
 async function runLimited<T>(
