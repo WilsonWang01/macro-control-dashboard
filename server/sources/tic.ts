@@ -7,7 +7,7 @@ const ticUrl =
 
 export async function fetchTicObservations(): Promise<SourceResult> {
   const fetchedAt = new Date().toISOString();
-  const html = await fetchText(ticUrl, 9000);
+  const html = await fetchText(ticUrl, 20000);
   const row = html
     .replace(/\s+/g, " ")
     .match(/Japan\s*(?:<\/[^>]+>\s*<[^>]+>|\s)+([\d.,\s]+)/i);

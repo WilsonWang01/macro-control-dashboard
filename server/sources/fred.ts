@@ -31,6 +31,9 @@ const fredSeries: FredSeries[] = [
   { seriesId: "IRLTLT01JPM156N", metricId: "jgb10y" }
 ];
 
+const fredTimeoutMs = 20000;
+const fredConcurrency = 3;
+
 export async function fetchFredObservations(): Promise<SourceResult> {
   const fetchedAt = new Date().toISOString();
   const start = new Date();
@@ -39,8 +42,10 @@ export async function fetchFredObservations(): Promise<SourceResult> {
   const observations: Observation[] = [];
   const failures: string[] = [];
 
-  await Promise.all(
-    fredSeries.map(async (series) => {
+  await runLimited(
+    fredSeries,
+    fredConcurrency,
+    async (series) => {
       try {
         const rows = process.env.FRED_API_KEY
           ? await fetchOfficialSeries(series, startDate)
@@ -61,7 +66,7 @@ export async function fetchFredObservations(): Promise<SourceResult> {
       } catch (error) {
         failures.push(`${series.seriesId}: ${error instanceof Error ? error.message : String(error)}`);
       }
-    })
+    }
   );
 
   return {
@@ -90,7 +95,7 @@ async function fetchOfficialSeries(series: FredSeries, startDate: string) {
     observation_start: startDate
   });
   const url = `https://api.stlouisfed.org/fred/series/observations?${params.toString()}`;
-  const text = await fetchText(url, 10000);
+  const text = await fetchText(url, fredTimeoutMs);
   const payload = JSON.parse(text) as {
     observations?: Array<{ date: string; value: string }>;
     error_message?: string;
@@ -108,7 +113,7 @@ async function fetchPublicCsvSeries(series: FredSeries, startDate: string) {
     cosd: startDate
   });
   const url = `https://fred.stlouisfed.org/graph/fredgraph.csv?${params.toString()}`;
-  const text = await fetchText(url, 10000);
+  const text = await fetchText(url, fredTimeoutMs);
   const rows = parseCsv(text);
   const [header, ...body] = rows;
   const dateIndex = header?.findIndex((cell) => cell.toLowerCase() === "observation_date" || cell.toLowerCase() === "date") ?? 0;
@@ -121,4 +126,21 @@ async function fetchPublicCsvSeries(series: FredSeries, startDate: string) {
       return date && value !== undefined ? { date, value } : undefined;
     })
     .filter((point): point is { date: string; value: number } => point !== undefined);
+}
+
+async function runLimited<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      await worker(item);
+    }
+  });
+
+  await Promise.all(workers);
 }
