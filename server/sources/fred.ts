@@ -31,7 +31,7 @@ const fredSeries: FredSeries[] = [
   { seriesId: "IRLTLT01JPM156N", metricId: "jgb10y" }
 ];
 
-const fredTimeoutMs = 20000;
+const fredTimeoutMs = 8000;
 const fredConcurrency = 3;
 
 export async function fetchFredObservations(): Promise<SourceResult> {

@@ -1,7 +1,13 @@
-const defaultAttempts = 2;
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const defaultAttempts = 1;
+const maxResponseBytes = 10 * 1024 * 1024;
+const execFileAsync = promisify(execFile);
 
 export async function fetchText(url: string, timeoutMs = 9000): Promise<string> {
-  return fetchWithRetry(url, timeoutMs, async (response) => response.text());
+  const buffer = await fetchBufferWithRetry(url, timeoutMs);
+  return buffer.toString("utf8");
 }
 
 export async function fetchDecodedText(
@@ -9,22 +15,19 @@ export async function fetchDecodedText(
   encoding: string,
   timeoutMs = 9000
 ): Promise<string> {
-  return fetchWithRetry(url, timeoutMs, async (response) => {
-    const buffer = await response.arrayBuffer();
-    return new TextDecoder(encoding).decode(buffer);
-  });
+  const buffer = await fetchBufferWithRetry(url, timeoutMs);
+  return new TextDecoder(encoding).decode(buffer);
 }
 
-async function fetchWithRetry<T>(
+async function fetchBufferWithRetry(
   url: string,
-  timeoutMs: number,
-  readResponse: (response: Response) => Promise<T>
-): Promise<T> {
+  timeoutMs: number
+): Promise<Buffer> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= defaultAttempts; attempt += 1) {
     try {
-      return await fetchOnce(url, timeoutMs, readResponse);
+      return await fetchOnce(url, timeoutMs);
     } catch (error) {
       lastError = error;
       if (attempt === defaultAttempts) break;
@@ -32,18 +35,65 @@ async function fetchWithRetry<T>(
     }
   }
 
-  if (isAbortError(lastError)) {
-    throw new Error(`Timed out after ${timeoutMs}ms`);
+  try {
+    return await fetchWithCurl(url, timeoutMs);
+  } catch (curlError) {
+    const primaryMessage = formatError(lastError);
+    const fallbackMessage = formatError(curlError);
+    throw new Error(`Fetch failed (${primaryMessage}); curl fallback failed (${fallbackMessage})`);
   }
-
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-async function fetchOnce<T>(
+async function fetchOnce(
   url: string,
-  timeoutMs: number,
-  readResponse: (response: Response) => Promise<T>
-): Promise<T> {
+  timeoutMs: number
+): Promise<Buffer> {
+  const response = await fetchResponse(url, timeoutMs);
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+async function fetchWithCurl(url: string, timeoutMs: number): Promise<Buffer> {
+  const timeoutSeconds = String(Math.max(1, Math.ceil(timeoutMs / 1000)));
+  const { stdout } = await execFileAsync(
+    "curl",
+    [
+      "-L",
+      "--http1.1",
+      "--fail",
+      "--silent",
+      "--show-error",
+      "--max-time",
+      timeoutSeconds,
+      "-H",
+      "user-agent: macro-control-dashboard/0.1",
+      "-H",
+      "cache-control: no-cache",
+      "-H",
+      "pragma: no-cache",
+      url
+    ],
+    {
+      encoding: "buffer",
+      maxBuffer: maxResponseBytes
+    }
+  );
+
+  return Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);
+}
+
+function formatError(error: unknown): string {
+  if (isAbortError(error)) {
+    return "timed out";
+  }
+
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function fetchResponse(
+  url: string,
+  timeoutMs: number
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -61,7 +111,7 @@ async function fetchOnce<T>(
       throw new Error(`${response.status} ${response.statusText}`);
     }
 
-    return await readResponse(response);
+    return response;
   } finally {
     clearTimeout(timer);
   }
