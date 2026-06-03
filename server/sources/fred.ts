@@ -36,8 +36,9 @@ const fredSeries: FredSeries[] = [
   { seriesId: "IRLTLT01JPM156N", metricId: "jgb10y" }
 ];
 
-const fredTimeoutMs = 8000;
-const fredConcurrency = 3;
+const fredCsvTimeoutMs = 8000;
+const fredXlsxTimeoutMs = 20000;
+const fredConcurrency = 2;
 const execFileAsync = promisify(execFile);
 
 export async function fetchFredObservations(): Promise<SourceResult> {
@@ -101,7 +102,7 @@ async function fetchOfficialSeries(series: FredSeries, startDate: string) {
     observation_start: startDate
   });
   const url = `https://api.stlouisfed.org/fred/series/observations?${params.toString()}`;
-  const text = await fetchText(url, fredTimeoutMs);
+  const text = await fetchText(url, fredXlsxTimeoutMs);
   const payload = JSON.parse(text) as {
     observations?: Array<{ date: string; value: string }>;
     error_message?: string;
@@ -137,7 +138,7 @@ async function fetchPublicCsvSeries(series: FredSeries, startDate: string) {
     cosd: startDate
   });
   const url = `https://fred.stlouisfed.org/graph/fredgraph.csv?${params.toString()}`;
-  const text = await fetchText(url, fredTimeoutMs);
+  const text = await fetchText(url, fredCsvTimeoutMs);
   const rows = parseCsv(text);
   const [header, ...body] = rows;
   const dateIndex = header?.findIndex((cell) => cell.toLowerCase() === "observation_date" || cell.toLowerCase() === "date") ?? 0;
@@ -158,7 +159,7 @@ async function fetchPublicXlsxSeries(series: FredSeries, startDate: string) {
     cosd: startDate
   });
   const url = `https://fred.stlouisfed.org/graph/fredgraph.xls?${params.toString()}`;
-  const buffer = await fetchBuffer(url, fredTimeoutMs);
+  const buffer = await fetchBuffer(url, fredXlsxTimeoutMs);
   const xml = await readXlsxSheetXml(buffer);
   return parseFredXlsxSheet(xml);
 }
