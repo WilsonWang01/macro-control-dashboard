@@ -37,6 +37,22 @@ describe("macro risk rules", () => {
     expect(snapshot.regime).toBe("日本外溢");
     expect(snapshot.alerts.some((alert) => alert.id === "japan-spillover-combo")).toBe(true);
   });
+
+  it("flags strong payrolls and rising rates as repricing pressure", () => {
+    const snapshot = evaluateDashboard([
+      ...series("nfp_change", [115, 172]),
+      ...series("ahe_mom", [0.2, 0.3]),
+      ...series("unrate", [4.3, 4.3]),
+      ...series("ust2y", [4.05, 4.15]),
+      ...series("ust10y", [4.47, 4.54]),
+      ...series("hy_oas", [275, 275]),
+      ...series("vix", [15, 15])
+    ]);
+
+    expect(snapshot.alerts.some((alert) => alert.id === "jobs-rates-repricing")).toBe(true);
+    expect(snapshot.regime).toBe("强就业利率再定价");
+    expect(snapshot.riskState).toBe("watch");
+  });
 });
 
 function series(metricId: string, values: number[]): Observation[] {

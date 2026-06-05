@@ -13,6 +13,7 @@ export type MetricUnit =
   | "percent"
   | "bp"
   | "index"
+  | "thousand_jobs"
   | "usd_billion"
   | "usd_trillion"
   | "yen_per_usd"

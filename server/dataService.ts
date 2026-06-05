@@ -5,6 +5,8 @@ import { fetchCboeObservations } from "./sources/cboe";
 import { fetchEcbFxObservations } from "./sources/ecb";
 import { fetchFredObservations } from "./sources/fred";
 import { fetchJapanMofObservations } from "./sources/japanMof";
+import { fetchMarketRateObservations } from "./sources/marketRates";
+import { fetchBlsEmploymentObservations } from "./sources/blsEmployment";
 import { fetchTicObservations } from "./sources/tic";
 import { fetchTreasuryCrosscheck } from "./sources/treasury";
 
@@ -14,10 +16,12 @@ type Fetcher = () => Promise<SourceResult>;
 
 const fetchers: Array<{ id: string; label: string; fetcher: Fetcher }> = [
   { id: "fred", label: "FRED", fetcher: fetchFredObservations },
+  { id: "bls-employment", label: "BLS Employment Situation", fetcher: fetchBlsEmploymentObservations },
   { id: "cboe", label: "Cboe VIX", fetcher: fetchCboeObservations },
   { id: "japan-mof", label: "Japan MOF JGB", fetcher: fetchJapanMofObservations },
   { id: "tic", label: "U.S. Treasury TIC", fetcher: fetchTicObservations },
   { id: "treasury", label: "U.S. Treasury Rates", fetcher: fetchTreasuryCrosscheck },
+  { id: "market-rates", label: "Market Rate Quotes", fetcher: fetchMarketRateObservations },
   { id: "ecb-fx", label: "ECB FX", fetcher: fetchEcbFxObservations }
 ];
 

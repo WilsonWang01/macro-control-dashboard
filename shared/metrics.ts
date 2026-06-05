@@ -256,6 +256,26 @@ export const metricDefinitions: MetricDefinition[] = [
     description: "美联储目标利率区间上限。"
   },
   {
+    id: "nfp_change",
+    label: "非农新增就业",
+    shortLabel: "NFP",
+    group: "macro",
+    unit: "thousand_jobs",
+    frequency: "monthly",
+    source: "FRED PAYEMS derived",
+    description: "非农就业月度变化，用来确认增长韧性或就业降温。"
+  },
+  {
+    id: "ahe_mom",
+    label: "平均时薪环比",
+    shortLabel: "AHE MoM",
+    group: "macro",
+    unit: "percent",
+    frequency: "monthly",
+    source: "FRED CES0500000003 derived",
+    description: "私人非农平均时薪月度变化，用来观察工资通胀压力。"
+  },
+  {
     id: "unrate",
     label: "美国失业率",
     shortLabel: "Unrate",

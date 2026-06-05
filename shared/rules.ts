@@ -61,6 +61,11 @@ export function evaluateDashboard(
   const rrp = latest(metrics, "rrp");
   const jgb10y = latest(metrics, "jgb10y");
   const usdjpy = latest(metrics, "usdjpy");
+  const nfpChange = latest(metrics, "nfp_change");
+  const aheMom = latest(metrics, "ahe_mom");
+  const unrate = latest(metrics, "unrate");
+  const ust2yChange1d = oneObservationChange(metrics, "ust2y");
+  const ust10yChange1d = oneObservationChange(metrics, "ust10y");
 
   if (ust10y !== undefined && ust10y > 4.75) {
     setMetricStatus(metrics, "ust10y", "risk", "10Y 高于 4.75%，估值折现压力进入红区。");
@@ -81,6 +86,37 @@ export function evaluateDashboard(
     addAlert(
       makeAlert("ust10y-momentum", "watch", "rates", ["ust10y"], "10Y 美债快速上行", `10Y 美债 5 个观测点变化为 ${fmt(ust10yChange * 100)}bp。`, "把这次调整优先解释为估值折现率冲击，而非信用危机。"),
       0.45
+    );
+  }
+
+  if (
+    nfpChange !== undefined &&
+    nfpChange >= 150 &&
+    (unrate ?? 99) <= 4.5 &&
+    ((ust2yChange1d ?? 0) >= 0.08 || (ust10yChange1d ?? 0) >= 0.05)
+  ) {
+    setMetricStatus(metrics, "nfp_change", "watch", "非农新增就业高于 15 万，同时失业率没有上行。");
+    setMetricStatus(metrics, "ust2y", maxState(metrics.ust2y?.status, "watch"), "2Y 美债单日上行，市场重新压低降息预期。");
+    setMetricStatus(metrics, "ust10y", maxState(metrics.ust10y?.status, "watch"), "10Y 美债跟随非农走高，估值折现率压力上升。");
+    if (aheMom !== undefined && aheMom >= 0.3) {
+      setMetricStatus(metrics, "ahe_mom", "watch", "平均时薪环比不低，工资通胀没有给 Fed 明显宽松空间。");
+    }
+    addAlert(
+      makeAlert(
+        "jobs-rates-repricing",
+        "watch",
+        "rates",
+        ["nfp_change", "unrate", "ahe_mom", "ust2y", "ust10y"],
+        "强非农推动利率再定价",
+        [
+          `非农新增 ${fmt(nfpChange)}k`,
+          `失业率 ${unrate !== undefined ? `${fmt(unrate)}%` : "--"}`,
+          ust2yChange1d !== undefined ? `2Y 单日 ${formatMetricChange(ust2yChange1d, "percent")}` : "",
+          ust10yChange1d !== undefined ? `10Y 单日 ${formatMetricChange(ust10yChange1d, "percent")}` : ""
+        ].filter(Boolean).join("，") + "。",
+        "把当前压力优先归因为 higher-for-longer 和估值折现率，而不是信用危机。"
+      ),
+      0.55
     );
   }
 
@@ -322,6 +358,12 @@ function latest(metrics: Record<string, MetricSnapshot>, metricId: string): numb
   return metrics[metricId]?.latest?.value;
 }
 
+function oneObservationChange(metrics: Record<string, MetricSnapshot>, metricId: string): number | undefined {
+  const latestPoint = metrics[metricId]?.latest;
+  const previousPoint = metrics[metricId]?.previous;
+  return latestPoint && previousPoint ? latestPoint.value - previousPoint.value : undefined;
+}
+
 function setMetricStatus(
   metrics: Record<string, MetricSnapshot>,
   metricId: string,
@@ -364,17 +406,22 @@ function stateFromScore(score: number, alerts: Alert[]): RiskState {
   if (score >= 75) return "crisis";
   if (score >= 50) return "risk";
   if (score >= 25) return "watch";
+  if (score >= 15 && alerts.some((alert) => alert.level === "watch")) return "watch";
   return "normal";
 }
 
 function classifyRegime(metrics: Record<string, MetricSnapshot>) {
   const ust10y = latest(metrics, "ust10y");
   const ust10yChange = metrics.ust10y?.change5d ?? 0;
+  const ust2yChange1d = oneObservationChange(metrics, "ust2y") ?? 0;
+  const ust10yChange1d = oneObservationChange(metrics, "ust10y") ?? 0;
   const hyOas = latest(metrics, "hy_oas");
   const vix = latest(metrics, "vix");
   const jgb10y = latest(metrics, "jgb10y");
   const usdjpy = latest(metrics, "usdjpy");
   const bei5y = latest(metrics, "bei5y");
+  const nfpChange = latest(metrics, "nfp_change");
+  const unrate = latest(metrics, "unrate");
 
   if ((hyOas ?? 0) > 450 && (vix ?? 0) > 30) {
     return {
@@ -387,6 +434,19 @@ function classifyRegime(metrics: Record<string, MetricSnapshot>) {
     return {
       regime: "日本外溢",
       regimeNote: "JGB、USDJPY 与 UST10Y 联动增强，长端期限溢价是第一观察变量。"
+    };
+  }
+
+  if (
+    (nfpChange ?? 0) >= 150 &&
+    (unrate ?? 99) <= 4.5 &&
+    (ust2yChange1d >= 0.08 || ust10yChange1d >= 0.05) &&
+    (hyOas ?? 999) < 350 &&
+    (vix ?? 99) < 22
+  ) {
+    return {
+      regime: "强就业利率再定价",
+      regimeNote: "非农强于趋势且失业率稳定，市场通过 2Y/10Y 上行重新定价 Fed 路径；这更像估值折现率压力，而不是信用或衰退危机。"
     };
   }
 
@@ -417,6 +477,12 @@ function buildActions(regime: string, riskState: RiskState, alerts: Alert[]): st
     actions.add("把利率端压力当成当前主风险源，不把它简单视为噪声。");
     actions.add("短线先调结构，降低长久期成长和高估值暴露。");
     actions.add("信用未转坏前，不把本轮直接解释为系统性熊市。");
+  }
+
+  if (regime === "强就业利率再定价") {
+    actions.add("把强非农后的利率上行视为当前主压力，不把它简单归为风险偏好恶化。");
+    actions.add("降低对快速降息和估值扩张的依赖，优先控制长久期成长敞口。");
+    actions.add("只要信用和 VIX 未确认恶化，避免把它升级成全面信用危机交易。");
   }
 
   if (regime === "信用风险/危机交易" || riskState === "crisis") {
@@ -461,6 +527,9 @@ function buildDashboardInterpretation({
   );
   const ust10y = latest(metrics, "ust10y");
   const ust10yChange = metrics.ust10y?.change5d;
+  const ust10yChange1d = oneObservationChange(metrics, "ust10y");
+  const ust2y = latest(metrics, "ust2y");
+  const ust2yChange1d = oneObservationChange(metrics, "ust2y");
   const curve10y2y = latest(metrics, "curve_10y2y");
   const curve10y3m = latest(metrics, "curve_10y3m");
   const igOas = latest(metrics, "ig_oas");
@@ -472,6 +541,8 @@ function buildDashboardInterpretation({
   const bei5y = latest(metrics, "bei5y");
   const rrp = latest(metrics, "rrp");
   const unrate = latest(metrics, "unrate");
+  const nfpChange = latest(metrics, "nfp_change");
+  const aheMom = latest(metrics, "ahe_mom");
   const dateOf = (metricId: string) => metrics[metricId]?.latest?.date;
   const topAlerts = alerts
     .filter((alert) => alert.id !== "rrp-low" || alerts.length === 1)
@@ -492,6 +563,21 @@ function buildDashboardInterpretation({
     headline: `${regime}，综合风险 ${riskScore}/100（${stateLabel(riskState)}）`,
     summary: [
       `当前主剧本是“${regime}”。${regimeNote}`,
+      [
+        "就业与利率再定价方面",
+        dateOf("nfp_change") || dateOf("ust2y") || dateOf("ust10y")
+          ? `（非农 ${dateOf("nfp_change") ?? "--"}，利率 ${dateOf("ust10y") ?? "--"}）`
+          : "",
+        "：",
+        nfpChange !== undefined ? `非农新增 ${fmt(nfpChange)}k` : "非农新增暂无数据",
+        unrate !== undefined ? `，失业率 ${fmt(unrate)}%` : "",
+        aheMom !== undefined ? `，平均时薪环比 ${fmt(aheMom)}%` : "",
+        ust2y !== undefined ? `；2Y 美债 ${fmt(ust2y)}%` : "",
+        ust2yChange1d !== undefined ? `，单日 ${formatMetricChange(ust2yChange1d, "percent")}` : "",
+        ust10y !== undefined ? `；10Y 美债 ${fmt(ust10y)}%` : "",
+        ust10yChange1d !== undefined ? `，单日 ${formatMetricChange(ust10yChange1d, "percent")}` : "",
+        "。强就业叠加前端利率上行时，风险主要来自降息预期后移和估值折现率上升。"
+      ].join(""),
       [
         "利率与曲线方面",
         dateOf("ust10y") ? `（美债 ${dateOf("ust10y")}）` : "",
@@ -617,6 +703,10 @@ function normalMetricSummary(
       return "日本持有美债是慢变量，用来观察资金回流是否落地。";
     case "fed_upper":
       return "政策利率上限说明 Fed 尚未提供明显快速宽松托底。";
+    case "nfp_change":
+      return value >= 150 ? "非农新增高于 15 万，说明就业韧性仍强，降息交易容易被压制。" : "非农新增未显示过热，更多用于确认就业是否降温。";
+    case "ahe_mom":
+      return value >= 0.3 ? "平均时薪环比不低，工资通胀没有给 Fed 明显宽松空间。" : "平均时薪环比温和，对降息预期的压力较小。";
     case "unrate":
       return "失业率未触发周期预警时，盈利下修压力尚未得到宏观确认。";
     case "real_gdp":
@@ -639,6 +729,7 @@ function formatMetricValue(value: number, unit: MetricUnit): string {
   const number = fmt(value);
   if (unit === "percent") return `${number}%`;
   if (unit === "bp") return `${number}bp`;
+  if (unit === "thousand_jobs") return `${number}k`;
   if (unit === "usd_billion") return `$${number}B`;
   if (unit === "usd_trillion") return `$${number}T`;
   return number;
@@ -647,6 +738,7 @@ function formatMetricValue(value: number, unit: MetricUnit): string {
 function formatMetricChange(value: number, unit: MetricUnit): string {
   if (unit === "percent") return `${value >= 0 ? "+" : ""}${fmt(value * 100)}bp`;
   if (unit === "bp") return `${value >= 0 ? "+" : ""}${fmt(value)}bp`;
+  if (unit === "thousand_jobs") return `${value >= 0 ? "+" : ""}${fmt(value)}k`;
   return `${value >= 0 ? "+" : ""}${fmt(value)}`;
 }
 
@@ -658,7 +750,7 @@ function buildCharts(grouped: Map<string, Observation[]>): Record<string, ChartP
     liquidity: mergeSeries(grouped, ["vix", "nfci"], 180),
     japan: mergeSeries(grouped, ["jgb10y", "usdjpy", "ust10y"], 180),
     inflation: mergeSeries(grouped, ["bei5y", "bei10y"], 180),
-    macro: mergeSeries(grouped, ["unrate"], 36)
+    macro: mergeSeries(grouped, ["nfp_change", "ahe_mom", "unrate"], 36)
   };
 }
 

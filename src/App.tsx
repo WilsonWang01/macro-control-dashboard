@@ -293,9 +293,9 @@ function Overview({ dashboard }: { dashboard: DashboardSnapshot }) {
           reference={2.75}
         />
         <MetricCluster
-          title="通胀、政策与宏观确认"
-          description="通胀补偿影响 Fed 托底空间，失业率和 GDP 用来判断估值压力是否转成盈利压力。"
-          metricIds={["bei5y", "bei10y", "fed_upper", "unrate", "real_gdp"]}
+          title="通胀、就业与政策确认"
+          description="通胀补偿影响 Fed 托底空间，非农/薪资和失业率判断利率压力来自韧性还是衰退。"
+          metricIds={["bei5y", "bei10y", "nfp_change", "ahe_mom", "fed_upper", "unrate"]}
           chartTitle="通胀补偿"
           chartData={dashboard.charts.inflation}
           chartMetricIds={["bei5y", "bei10y"]}
@@ -321,6 +321,7 @@ function MonitorMatrix({ dashboard }: { dashboard: DashboardSnapshot }) {
         <ChartCard title="波动率与金融条件" data={dashboard.charts.liquidity} metricIds={["vix", "nfci"]} metrics={dashboard.metrics} reference={22} />
         <ChartCard title="日本外溢三角" data={dashboard.charts.japan} metricIds={["jgb10y", "usdjpy", "ust10y"]} metrics={dashboard.metrics} reference={2.75} />
         <ChartCard title="通胀补偿" data={dashboard.charts.inflation} metricIds={["bei5y", "bei10y"]} metrics={dashboard.metrics} reference={2.8} />
+        <ChartCard title="就业确认" data={dashboard.charts.macro} metricIds={["nfp_change", "ahe_mom", "unrate"]} metrics={dashboard.metrics} />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[
@@ -334,6 +335,8 @@ function MonitorMatrix({ dashboard }: { dashboard: DashboardSnapshot }) {
           "bei5y",
           "nfci",
           "rrp",
+          "nfp_change",
+          "ahe_mom",
           "unrate",
           "fed_upper"
         ].map((id) => (
@@ -400,13 +403,13 @@ function Japan({ dashboard }: { dashboard: DashboardSnapshot }) {
 function Macro({ dashboard }: { dashboard: DashboardSnapshot }) {
   return (
     <SectionLayout
-      cards={["bei5y", "bei10y", "fed_upper", "unrate", "real_gdp"].map((id) => (
+      cards={["bei5y", "bei10y", "nfp_change", "ahe_mom", "fed_upper", "unrate", "real_gdp"].map((id) => (
         <MetricCard key={id} metric={dashboard.metrics[id]} />
       ))}
       charts={
         <>
           <ChartCard title="通胀补偿" data={dashboard.charts.inflation} metricIds={["bei5y", "bei10y"]} metrics={dashboard.metrics} reference={2.8} />
-          <ChartCard title="失业率" data={dashboard.charts.macro} metricIds={["unrate"]} metrics={dashboard.metrics} />
+          <ChartCard title="就业确认" data={dashboard.charts.macro} metricIds={["nfp_change", "ahe_mom", "unrate"]} metrics={dashboard.metrics} />
         </>
       }
     />
@@ -427,6 +430,8 @@ function Rules({ dashboard }: { dashboard: DashboardSnapshot }) {
     ["VIX", ">22 观察，>30 风险"],
     ["NFCI", ">0 观察"],
     ["RRP", "<100 亿美元仅提示缓冲池低"],
+    ["非农 + 利率", "非农新增 >=150k、失业率 <=4.5%，且 2Y 单日上行 >=8bp 或 10Y 单日上行 >=5bp：观察"],
+    ["平均时薪", "环比 >=0.3% 时作为 Fed 宽松空间不足的确认项"],
     ["失业率", "3个月均值较12个月低点：>=0.3pp 观察，>=0.5pp 风险"]
   ];
 
@@ -480,7 +485,7 @@ function ScoringLogic({ dashboard }: { dashboard: DashboardSnapshot }) {
     { label: "通胀", weight: 15, state: maxMetricState(dashboard, ["bei5y", "bei10y"]) },
     { label: "日本/汇率", weight: 15, state: maxMetricState(dashboard, ["jgb10y", "usdjpy"]) },
     { label: "流动性/波动", weight: 10, state: maxMetricState(dashboard, ["vix", "nfci", "rrp"]) },
-    { label: "宏观确认", weight: 5, state: maxMetricState(dashboard, ["unrate", "real_gdp", "fed_upper"]) }
+    { label: "宏观确认", weight: 5, state: maxMetricState(dashboard, ["nfp_change", "ahe_mom", "unrate", "real_gdp", "fed_upper"]) }
   ];
 
   return (
@@ -966,6 +971,7 @@ function formatValue(value: number, unit: MetricUnit): string {
 
   if (unit === "percent") return `${number}%`;
   if (unit === "bp") return `${number}bp`;
+  if (unit === "thousand_jobs") return `${number}k`;
   if (unit === "usd_billion") return `$${number}B`;
   if (unit === "usd_trillion") return `$${number}T`;
   if (unit === "yen_per_usd") return number;
@@ -975,6 +981,7 @@ function formatValue(value: number, unit: MetricUnit): string {
 function formatChange(value: number, unit: MetricUnit): string {
   if (unit === "percent") return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(0)}bp`;
   if (unit === "bp") return `${value >= 0 ? "+" : ""}${value.toFixed(0)}bp`;
+  if (unit === "thousand_jobs") return `${value >= 0 ? "+" : ""}${value.toFixed(0)}k`;
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
@@ -992,6 +999,7 @@ function getDataCutoffLabel(dashboard: DashboardSnapshot): string {
   const dateOf = (id: string) => dashboard.metrics[id]?.latest?.date ?? "--";
   return [
     `美债 ${dateOf("ust10y")}`,
+    `就业 ${dateOf("nfp_change")}`,
     `信用 ${dateOf("hy_oas")}`,
     `VIX ${dateOf("vix")}`,
     `日债 ${dateOf("jgb10y")}`

@@ -30,6 +30,8 @@ const fredSeries: FredSeries[] = [
   { seriesId: "WALCL", metricId: "fed_assets", transform: (value) => value / 1_000_000 },
   { seriesId: "RRPONTSYD", metricId: "rrp" },
   { seriesId: "DEXJPUS", metricId: "usdjpy" },
+  { seriesId: "PAYEMS", metricId: "payems" },
+  { seriesId: "CES0500000003", metricId: "average_hourly_earnings" },
   { seriesId: "UNRATE", metricId: "unrate" },
   { seriesId: "GDPC1", metricId: "real_gdp" },
   { seriesId: "DFEDTARU", metricId: "fed_upper" },
@@ -58,18 +60,7 @@ export async function fetchFredObservations(): Promise<SourceResult> {
           ? await fetchOfficialSeries(series, startDate)
           : await fetchPublicSeries(series, startDate);
 
-        for (const row of rows) {
-          const value = series.transform ? series.transform(row.value) : row.value;
-          observations.push({
-            metricId: series.metricId,
-            date: row.date,
-            value,
-            source: `FRED:${series.seriesId}`,
-            quality:
-              series.seriesId === "IRLTLT01JPM156N" ? "low-frequency" : "ok",
-            fetchedAt
-          });
-        }
+        observations.push(...buildFredObservations(series, rows, fetchedAt));
       } catch (error) {
         failures.push(`${series.seriesId}: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -92,6 +83,54 @@ export async function fetchFredObservations(): Promise<SourceResult> {
     },
     observations
   };
+}
+
+function buildFredObservations(
+  series: FredSeries,
+  rows: Array<{ date: string; value: number }>,
+  fetchedAt: string
+): Observation[] {
+  const observations: Observation[] = [];
+
+  rows.forEach((row, index) => {
+    const value = series.transform ? series.transform(row.value) : row.value;
+    observations.push({
+      metricId: series.metricId,
+      date: row.date,
+      value,
+      source: `FRED:${series.seriesId}`,
+      quality:
+        series.seriesId === "IRLTLT01JPM156N" ? "low-frequency" : "ok",
+      fetchedAt
+    });
+
+    const previous = rows[index - 1];
+    if (!previous) return;
+
+    if (series.seriesId === "PAYEMS") {
+      observations.push({
+        metricId: "nfp_change",
+        date: row.date,
+        value: Number((row.value - previous.value).toFixed(3)),
+        source: "FRED:PAYEMS:derived",
+        quality: "ok",
+        fetchedAt
+      });
+    }
+
+    if (series.seriesId === "CES0500000003" && previous.value !== 0) {
+      observations.push({
+        metricId: "ahe_mom",
+        date: row.date,
+        value: Number(((row.value / previous.value - 1) * 100).toFixed(4)),
+        source: "FRED:CES0500000003:derived",
+        quality: "ok",
+        fetchedAt
+      });
+    }
+  });
+
+  return observations;
 }
 
 async function fetchOfficialSeries(series: FredSeries, startDate: string) {
