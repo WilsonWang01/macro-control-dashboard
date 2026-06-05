@@ -154,10 +154,6 @@ async function fetchOfficialSeries(series: FredSeries, startDate: string) {
 }
 
 async function fetchPublicSeries(series: FredSeries, startDate: string) {
-  if (process.env.GITHUB_ACTIONS) {
-    return fetchPublicXlsxSeries(series, startDate);
-  }
-
   try {
     return await fetchPublicCsvSeries(series, startDate);
   } catch (csvError) {
