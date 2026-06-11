@@ -69,9 +69,18 @@ export async function fetchMarketRateObservations(): Promise<SourceResult> {
 }
 
 function parseMarketRatePage(html: string, label: string): { date: string; value: number } {
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ");
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = html.match(
-    new RegExp(`${escapedLabel}\\s+(?:rose|fell|increased|decreased)[^<\\n]*?to\\s+([0-9.]+)%\\s+on\\s+([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})`, "i")
+  const match = text.match(
+    new RegExp(
+      `${escapedLabel}\\s+(?:rose|fell|increased|decreased|eased|advanced|climbed|dropped|declined|slipped|retreated)[^.]*?to\\s+([0-9.]+)%\\s+on\\s+([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})`,
+      "i"
+    )
   );
 
   if (!match) {
