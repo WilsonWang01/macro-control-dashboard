@@ -105,6 +105,36 @@ export const metricDefinitions: MetricDefinition[] = [
     description: "高收益债融资成本。"
   },
   {
+    id: "hyg_price",
+    label: "HYG 高收益债 ETF",
+    shortLabel: "HYG",
+    group: "credit",
+    unit: "index",
+    frequency: "daily",
+    source: "Yahoo HYG delayed quote",
+    description: "高收益债 ETF 价格，作为 OAS 滞后时的快速信用市场代理。"
+  },
+  {
+    id: "lqd_price",
+    label: "LQD 投资级债 ETF",
+    shortLabel: "LQD",
+    group: "credit",
+    unit: "index",
+    frequency: "daily",
+    source: "Yahoo LQD delayed quote",
+    description: "投资级债 ETF 价格，作为优质信用风险偏好的快速代理。"
+  },
+  {
+    id: "hyg_lqd_ratio",
+    label: "HYG/LQD 比值",
+    shortLabel: "HYG/LQD",
+    group: "credit",
+    unit: "score",
+    frequency: "daily",
+    source: "Yahoo HYG/LQD derived",
+    description: "高收益债相对投资级债的价格比值，用来快速观察信用风险偏好。"
+  },
+  {
     id: "bei5y",
     label: "5年盈亏平衡通胀",
     shortLabel: "5Y BEI",

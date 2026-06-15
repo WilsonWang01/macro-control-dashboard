@@ -18,10 +18,12 @@ const runtimeSources = [
   "server/sources/cboe.ts",
   "server/sources/ecb.ts",
   "server/sources/fred.ts",
+  "server/sources/japanMarketRates.ts",
   "server/sources/japanMof.ts",
   "server/sources/marketRates.ts",
   "server/sources/tic.ts",
   "server/sources/treasury.ts",
+  "server/sources/yahooMarket.ts",
   "shared/metrics.ts",
   "shared/rules.ts",
   "shared/types.ts"

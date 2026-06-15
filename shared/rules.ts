@@ -534,6 +534,9 @@ function buildDashboardInterpretation({
   const curve10y3m = latest(metrics, "curve_10y3m");
   const igOas = latest(metrics, "ig_oas");
   const hyOas = latest(metrics, "hy_oas");
+  const hygPrice = latest(metrics, "hyg_price");
+  const lqdPrice = latest(metrics, "lqd_price");
+  const hygLqdRatio = latest(metrics, "hyg_lqd_ratio");
   const vix = latest(metrics, "vix");
   const nfci = latest(metrics, "nfci");
   const jgb10y = latest(metrics, "jgb10y");
@@ -596,6 +599,9 @@ function buildDashboardInterpretation({
         "：",
         hyOas !== undefined ? `HY OAS ${fmt(hyOas)}bp` : "HY OAS 暂无数据",
         igOas !== undefined ? `，IG OAS ${fmt(igOas)}bp` : "",
+        hygPrice !== undefined ? `；HYG ${fmt(hygPrice)}` : "",
+        lqdPrice !== undefined ? `，LQD ${fmt(lqdPrice)}` : "",
+        hygLqdRatio !== undefined ? `，HYG/LQD ${fmt(hygLqdRatio)}` : "",
         vix !== undefined ? `，VIX ${fmt(vix)}` : "",
         nfci !== undefined ? `，NFCI ${fmt(nfci)}` : "",
         rrp !== undefined && rrp < 10 ? "；RRP 缓冲池已经很低，是边际流动性黄灯" : "",
@@ -676,6 +682,12 @@ function normalMetricSummary(
       return "投资级有效收益率代表企业融资成本，水平偏高但利差未同步失控。";
     case "hy_yield":
       return "高收益有效收益率显示风险企业融资成本，需结合 HY OAS 判断是否恶化。";
+    case "hyg_price":
+      return "HYG 是高收益债 ETF 快速代理；它更新更快，但不替代 OAS 风险阈值。";
+    case "lqd_price":
+      return "LQD 是投资级债 ETF 快速代理；用于观察优质信用市场价格变化。";
+    case "hyg_lqd_ratio":
+      return "HYG/LQD 反映高收益相对投资级债风险偏好，方向性用于辅助确认信用市场情绪。";
     case "bei5y":
       return value > 2.4 ? "5年通胀补偿仍偏高，Fed 快速宽松空间有限。" : "5年通胀补偿回落，对成长股估值更友好。";
     case "bei10y":
@@ -747,6 +759,7 @@ function buildCharts(grouped: Map<string, Observation[]>): Record<string, ChartP
     rates: mergeSeries(grouped, ["ust3m", "ust2y", "ust5y", "ust10y"], 180),
     curve: mergeSeries(grouped, ["curve_10y2y", "curve_10y3m"], 180),
     credit: mergeSeries(grouped, ["ig_oas", "hy_oas"], 180),
+    creditProxy: mergeSeries(grouped, ["hyg_price", "lqd_price", "hyg_lqd_ratio"], 60),
     liquidity: mergeSeries(grouped, ["vix", "nfci"], 180),
     japan: mergeSeries(grouped, ["jgb10y", "usdjpy", "ust10y"], 180),
     inflation: mergeSeries(grouped, ["bei5y", "bei10y"], 180),

@@ -4,11 +4,13 @@ import { isCacheFresh, mergeObservations, readCache, writeCache, type CachedData
 import { fetchCboeObservations } from "./sources/cboe";
 import { fetchEcbFxObservations } from "./sources/ecb";
 import { fetchFredObservations } from "./sources/fred";
+import { fetchJapanMarketRateObservations } from "./sources/japanMarketRates";
 import { fetchJapanMofObservations } from "./sources/japanMof";
 import { fetchMarketRateObservations } from "./sources/marketRates";
 import { fetchBlsEmploymentObservations } from "./sources/blsEmployment";
 import { fetchTicObservations } from "./sources/tic";
 import { fetchTreasuryCrosscheck } from "./sources/treasury";
+import { fetchYahooMarketObservations } from "./sources/yahooMarket";
 
 const cacheMaxAgeMs = 1000 * 60 * 60 * 6;
 
@@ -18,7 +20,9 @@ const fetchers: Array<{ id: string; label: string; fetcher: Fetcher }> = [
   { id: "fred", label: "FRED", fetcher: fetchFredObservations },
   { id: "bls-employment", label: "BLS Employment Situation", fetcher: fetchBlsEmploymentObservations },
   { id: "cboe", label: "Cboe VIX", fetcher: fetchCboeObservations },
+  { id: "yahoo-market", label: "Yahoo Market Quotes", fetcher: fetchYahooMarketObservations },
   { id: "japan-mof", label: "Japan MOF JGB", fetcher: fetchJapanMofObservations },
+  { id: "japan-market-rates", label: "Japan Market Rate Quotes", fetcher: fetchJapanMarketRateObservations },
   { id: "tic", label: "U.S. Treasury TIC", fetcher: fetchTicObservations },
   { id: "treasury", label: "U.S. Treasury Rates", fetcher: fetchTreasuryCrosscheck },
   { id: "market-rates", label: "Market Rate Quotes", fetcher: fetchMarketRateObservations },

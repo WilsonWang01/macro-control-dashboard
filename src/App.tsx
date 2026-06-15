@@ -275,7 +275,7 @@ function Overview({ dashboard }: { dashboard: DashboardSnapshot }) {
         <MetricCluster
           title="信用、波动与流动性"
           description="信用利差决定利率冲击是否升级，VIX/NFCI/RRP 负责确认风险偏好和流动性条件。"
-          metricIds={["hy_oas", "ig_oas", "vix", "nfci", "rrp", "fed_assets"]}
+          metricIds={["hy_oas", "ig_oas", "hyg_price", "lqd_price", "vix", "nfci", "rrp", "fed_assets"]}
           chartTitle="信用利差"
           chartData={dashboard.charts.credit}
           chartMetricIds={["ig_oas", "hy_oas"]}
@@ -318,6 +318,7 @@ function MonitorMatrix({ dashboard }: { dashboard: DashboardSnapshot }) {
         <ChartCard title="美债期限结构" data={dashboard.charts.rates} metricIds={["ust3m", "ust2y", "ust5y", "ust10y"]} metrics={dashboard.metrics} reference={4.6} />
         <ChartCard title="曲线形状" data={dashboard.charts.curve} metricIds={["curve_10y2y", "curve_10y3m"]} metrics={dashboard.metrics} reference={0} />
         <ChartCard title="信用利差" data={dashboard.charts.credit} metricIds={["ig_oas", "hy_oas"]} metrics={dashboard.metrics} reference={350} />
+        <ChartCard title="信用 ETF 快速代理" data={dashboard.charts.creditProxy} metricIds={["hyg_price", "lqd_price", "hyg_lqd_ratio"]} metrics={dashboard.metrics} />
         <ChartCard title="波动率与金融条件" data={dashboard.charts.liquidity} metricIds={["vix", "nfci"]} metrics={dashboard.metrics} reference={22} />
         <ChartCard title="日本外溢三角" data={dashboard.charts.japan} metricIds={["jgb10y", "usdjpy", "ust10y"]} metrics={dashboard.metrics} reference={2.75} />
         <ChartCard title="通胀补偿" data={dashboard.charts.inflation} metricIds={["bei5y", "bei10y"]} metrics={dashboard.metrics} reference={2.8} />
@@ -329,6 +330,9 @@ function MonitorMatrix({ dashboard }: { dashboard: DashboardSnapshot }) {
           "curve_10y3m",
           "hy_oas",
           "ig_oas",
+          "hyg_price",
+          "lqd_price",
+          "hyg_lqd_ratio",
           "vix",
           "jgb10y",
           "usdjpy",
@@ -366,12 +370,13 @@ function Rates({ dashboard }: { dashboard: DashboardSnapshot }) {
 function Credit({ dashboard }: { dashboard: DashboardSnapshot }) {
   return (
     <SectionLayout
-      cards={["ig_oas", "hy_oas", "ig_yield", "hy_yield", "vix", "nfci", "fed_assets", "rrp"].map((id) => (
+      cards={["ig_oas", "hy_oas", "ig_yield", "hy_yield", "hyg_price", "lqd_price", "hyg_lqd_ratio", "vix", "nfci", "fed_assets", "rrp"].map((id) => (
         <MetricCard key={id} metric={dashboard.metrics[id]} />
       ))}
       charts={
         <>
           <ChartCard title="信用利差" data={dashboard.charts.credit} metricIds={["ig_oas", "hy_oas"]} metrics={dashboard.metrics} reference={350} />
+          <ChartCard title="信用 ETF 快速代理" data={dashboard.charts.creditProxy} metricIds={["hyg_price", "lqd_price", "hyg_lqd_ratio"]} metrics={dashboard.metrics} />
           <ChartCard title="风险情绪与金融条件" data={dashboard.charts.liquidity} metricIds={["vix", "nfci"]} metrics={dashboard.metrics} reference={22} />
         </>
       }
@@ -1001,6 +1006,7 @@ function getDataCutoffLabel(dashboard: DashboardSnapshot): string {
     `美债 ${dateOf("ust10y")}`,
     `就业 ${dateOf("nfp_change")}`,
     `信用 ${dateOf("hy_oas")}`,
+    `信用代理 ${dateOf("hyg_price")}`,
     `VIX ${dateOf("vix")}`,
     `日债 ${dateOf("jgb10y")}`
   ].join(" / ");
