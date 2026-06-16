@@ -316,6 +316,26 @@ export const metricDefinitions: MetricDefinition[] = [
     description: "就业周期和衰退确认变量。"
   },
   {
+    id: "initial_claims",
+    label: "初请失业金人数",
+    shortLabel: "Initial Claims",
+    group: "macro",
+    unit: "thousand_people",
+    frequency: "weekly",
+    source: "FRED ICSA",
+    description: "就业市场高频代理，用于观察裁员边际变化。"
+  },
+  {
+    id: "continued_claims",
+    label: "续请失业金人数",
+    shortLabel: "Continued Claims",
+    group: "macro",
+    unit: "thousand_people",
+    frequency: "weekly",
+    source: "FRED CCSA",
+    description: "就业市场高频代理，用于观察再就业难度和劳动力需求降温。"
+  },
+  {
     id: "real_gdp",
     label: "美国实际 GDP",
     shortLabel: "Real GDP",

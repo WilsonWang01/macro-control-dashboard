@@ -33,6 +33,8 @@ const fredSeries: FredSeries[] = [
   { seriesId: "PAYEMS", metricId: "payems" },
   { seriesId: "CES0500000003", metricId: "average_hourly_earnings" },
   { seriesId: "UNRATE", metricId: "unrate" },
+  { seriesId: "ICSA", metricId: "initial_claims", transform: (value) => value / 1000 },
+  { seriesId: "CCSA", metricId: "continued_claims", transform: (value) => value / 1000 },
   { seriesId: "GDPC1", metricId: "real_gdp" },
   { seriesId: "DFEDTARU", metricId: "fed_upper" },
   { seriesId: "IRLTLT01JPM156N", metricId: "jgb10y" }

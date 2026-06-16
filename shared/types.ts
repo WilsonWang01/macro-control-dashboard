@@ -14,6 +14,7 @@ export type MetricUnit =
   | "bp"
   | "index"
   | "thousand_jobs"
+  | "thousand_people"
   | "usd_billion"
   | "usd_trillion"
   | "yen_per_usd"

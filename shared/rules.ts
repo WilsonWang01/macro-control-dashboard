@@ -544,9 +544,14 @@ function buildDashboardInterpretation({
   const bei5y = latest(metrics, "bei5y");
   const rrp = latest(metrics, "rrp");
   const unrate = latest(metrics, "unrate");
+  const initialClaims = latest(metrics, "initial_claims");
+  const continuedClaims = latest(metrics, "continued_claims");
   const nfpChange = latest(metrics, "nfp_change");
   const aheMom = latest(metrics, "ahe_mom");
-  const dateOf = (metricId: string) => metrics[metricId]?.latest?.date;
+  const dateOf = (metricId: string) => {
+    const metric = metrics[metricId];
+    return metric?.latest?.date ? formatObservationPeriod(metric.latest.date, metric.definition.frequency) : undefined;
+  };
   const topAlerts = alerts
     .filter((alert) => alert.id !== "rrp-low" || alerts.length === 1)
     .slice(0, 4)
@@ -575,11 +580,13 @@ function buildDashboardInterpretation({
         nfpChange !== undefined ? `非农新增 ${fmt(nfpChange)}k` : "非农新增暂无数据",
         unrate !== undefined ? `，失业率 ${fmt(unrate)}%` : "",
         aheMom !== undefined ? `，平均时薪环比 ${fmt(aheMom)}%` : "",
+        initialClaims !== undefined ? `，初请 ${fmt(initialClaims)}k` : "",
+        continuedClaims !== undefined ? `，续请 ${fmt(continuedClaims)}k` : "",
         ust2y !== undefined ? `；2Y 美债 ${fmt(ust2y)}%` : "",
         ust2yChange1d !== undefined ? `，单日 ${formatMetricChange(ust2yChange1d, "percent")}` : "",
         ust10y !== undefined ? `；10Y 美债 ${fmt(ust10y)}%` : "",
         ust10yChange1d !== undefined ? `，单日 ${formatMetricChange(ust10yChange1d, "percent")}` : "",
-        "。强就业叠加前端利率上行时，风险主要来自降息预期后移和估值折现率上升。"
+        "。非农和失业率是月度确认，初请/续请是更高频的就业降温代理；强就业叠加前端利率上行时，风险主要来自降息预期后移和估值折现率上升。"
       ].join(""),
       [
         "利率与曲线方面",
@@ -721,6 +728,10 @@ function normalMetricSummary(
       return value >= 0.3 ? "平均时薪环比不低，工资通胀没有给 Fed 明显宽松空间。" : "平均时薪环比温和，对降息预期的压力较小。";
     case "unrate":
       return "失业率未触发周期预警时，盈利下修压力尚未得到宏观确认。";
+    case "initial_claims":
+      return "初请失业金是周度就业高频代理；单周上行需要结合续请和非农确认，连续走高才代表裁员压力扩散。";
+    case "continued_claims":
+      return "续请失业金观察再就业难度；若持续抬升，会比单月非农更早提示就业韧性变弱。";
     case "real_gdp":
       return "实际 GDP 是慢变量，用于确认经济扩张或收缩背景。";
     default:
@@ -742,6 +753,7 @@ function formatMetricValue(value: number, unit: MetricUnit): string {
   if (unit === "percent") return `${number}%`;
   if (unit === "bp") return `${number}bp`;
   if (unit === "thousand_jobs") return `${number}k`;
+  if (unit === "thousand_people") return `${number}k`;
   if (unit === "usd_billion") return `$${number}B`;
   if (unit === "usd_trillion") return `$${number}T`;
   return number;
@@ -751,6 +763,7 @@ function formatMetricChange(value: number, unit: MetricUnit): string {
   if (unit === "percent") return `${value >= 0 ? "+" : ""}${fmt(value * 100)}bp`;
   if (unit === "bp") return `${value >= 0 ? "+" : ""}${fmt(value)}bp`;
   if (unit === "thousand_jobs") return `${value >= 0 ? "+" : ""}${fmt(value)}k`;
+  if (unit === "thousand_people") return `${value >= 0 ? "+" : ""}${fmt(value)}k`;
   return `${value >= 0 ? "+" : ""}${fmt(value)}`;
 }
 
@@ -763,7 +776,8 @@ function buildCharts(grouped: Map<string, Observation[]>): Record<string, ChartP
     liquidity: mergeSeries(grouped, ["vix", "nfci"], 180),
     japan: mergeSeries(grouped, ["jgb10y", "usdjpy", "ust10y"], 180),
     inflation: mergeSeries(grouped, ["bei5y", "bei10y"], 180),
-    macro: mergeSeries(grouped, ["nfp_change", "ahe_mom", "unrate"], 36)
+    macro: mergeSeries(grouped, ["nfp_change", "ahe_mom", "unrate"], 36),
+    laborClaims: mergeSeries(grouped, ["initial_claims", "continued_claims"], 104)
   };
 }
 
@@ -825,6 +839,13 @@ function fmt(value: number): string {
   return new Intl.NumberFormat("zh-CN", {
     maximumFractionDigits: Math.abs(value) >= 100 ? 0 : 2
   }).format(value);
+}
+
+function formatObservationPeriod(date: string, frequency: MetricDefinition["frequency"]): string {
+  const [year, month] = date.split("-");
+  if (frequency === "monthly" && year && month) return `${year}年${Number(month)}月`;
+  if (frequency === "quarterly" && year && month) return `${year}Q${Math.floor((Number(month) - 1) / 3) + 1}`;
+  return date;
 }
 
 export function getDefinition(metricId: string) {
